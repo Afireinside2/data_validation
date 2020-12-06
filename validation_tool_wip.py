@@ -223,8 +223,12 @@ def end_selector():
  if (anything_else=='1'): validation_selector()
  elif (anything_else=='2'): print("""
                                   
-                                 ***Goodbye***""")
- exit()
+                                 ***Goodbye***  
+                                 
+                                 
+                                 
+                                 """)
+
 
 def transform_EV():
  print("""Hi there - i'm going to help you transform your EV Data file
@@ -276,8 +280,8 @@ def country_validation():
 
  bounding_box = pd.DataFrame(country_bounding_boxes)
  bounding_box = bounding_box.transpose()
- bounding_box['Country']= bounding_box.index
- bounding_box.columns = ['Long_Country', 'lngmin','latmin','lngmax', 'latmax','Country']
+ bounding_box['Country Code']= bounding_box.index
+ bounding_box.columns = ['Long_Country', 'lngmin','latmin','lngmax', 'latmax','Country Code']
 #print(bounding_box.head())
 
 
@@ -287,7 +291,7 @@ def country_validation():
 Hi there, i'm going to help you validate your coordinates.
  
  
-Before starting, please ensure the column containing latitudes is titled 'Lat' and the column containing longtitudes is titled 'Lng'
+Before starting, please ensure the column containing latitudes is titled 'Lat', the column containing longtitudes is titled 'Lng' and the column containing country code is titled 'Country Code' 
                    
                    
                    
@@ -295,14 +299,14 @@ Where is the file saved?
 
 """)
  test_data = pd.read_excel(take_from)
- test_data['Country'] = test_data['Country'].str.upper()       
- bounding_box['Country'] = bounding_box['Country'].str.upper() 
+ test_data['Country Code'] = test_data['Country Code'].str.upper()       
+ bounding_box['Country Code'] = bounding_box['Country Code'].str.upper() 
  test_data.replace(" ", "")
  bounding_box.replace(" ", "")
 
  to_use  = pd.merge(test_data,  
                       bounding_box,  
-                      on ='Country',  
+                      on ='Country Code',  
                       how ='left') 
 
 #test lat
