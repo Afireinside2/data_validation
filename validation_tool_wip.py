@@ -1,8 +1,15 @@
 import pandas as pd
 import datetime
 import numpy as np
-import xlrd
+from global_land_mask import globe
 
+selection = ()
+take_from = ()
+test_data = () 
+to_use=()
+date = datetime.date.today().strftime("%Y%d%m")
+
+#dictionary of countries with CC as key
 country_bounding_boxes = {
     'AF': ('Afghanistan', 60.5284298033, 29.318572496, 75.1580277851, 38.4862816432),
     'AO': ('Angola', 11.6400960629, -17.9306364885, 24.0799052263, -4.43802336998),
@@ -180,163 +187,217 @@ country_bounding_boxes = {
 }
 
 def validation_selector():
-
- print("""
-       
-Hello and welcome to the Geo.me file validation and transformer tool""")
- selection = input ("""What are you looking to do today?:
-                   
-                   
-                  [1] Prepare a NewMotion File for Upload
-                  [2] Validate coordinates
-                   
-                   Type '1' or '2' :""")
+ print("\nHello and welcome to the Geo.me validation and transformer tool\n")
+ global selection
+ selection = input ("What are you looking to do today?:\n\n[1] Prepare a NewMotion File for Upload \n[2] Validate coordinates\n[3] Lookup Country Codes\n[4] Wet Checker\n[5] Nothing today thanks\n\nPlease type the number of your selection: ")
  if (selection =='1'): transform_EV()
- elif (selection=='2'): country_validation()
+ elif (selection=='2'): country_validation_input()
+ elif (selection=='3'): individual_country_code_lookup()
+ elif (selection == '4'): wet_checker_file_input()
+ elif (selection=='5'): print("\n\n\t\t\t\t\t\t\t\t\t\t\t\t***Goodbye***" "\n""\n")
  else: validation_selector_try_again()
                    
 def validation_selector_try_again():
 
- print("""
-       
-I'm sorry - I didnt recognise that selection - please try agsain""")
- selection = input ("""What are you looking to do today?:
-                   
-                   
-                  [1] Prepare a NewMotion File for Upload
-                  [2] Validate coordinates
-                   
-                   Type '1' or '2' :""")
- if (selection =='1'): transform_EV()
- elif (selection=='2'): country_validation()
- else: validation_selector_try_again()
-                   
-def end_selector():
- anything_else = input("""
-                      
-                      Is there anything else I can help you with today?
-                      
-                      [1] Return to Main Menu
-                      [2] Quit
-                      
-                      Type '1' or '2' :""")
- if (anything_else=='1'): validation_selector()
- elif (anything_else=='2'): print("""
-                                  
-                                 ***Goodbye***  
-                                 
-                                 
-                                 
-                                 """)
+ print("\n\nI'm sorry - I didnt recognise that selection - please try agsain")
+ 
+ validation_selector()
 
+def wet_checker_file_input():
+
+ selection = input("Would you like to check an entire file or one location?\n\n[1] One Location\n[2] A File\n\nPlease type '1' or '2'")
+ if (selection =='2'):
+  global take_from
+  take_from = input("Which file would you like me to check?:  ")
+  wet_checker()
+ else: 
+  wet_checker_single_site()
+
+def end_selector():
+ global selection
+ selection = input("\n Is there anything else I can help you with today?\n")
+ validation_selector()                 
 
 def transform_EV():
- print("""Hi there - i'm going to help you transform your EV Data file
-           
- """)
-
+ print("Hi there - i'm going to help you transform your EV Data file")
+ global take_from
  take_from = input ("First up, where is the file saved?: ")
- save_to = input("Cool, where would you like me to put the results?:")
-
-
- date = datetime.date.today().strftime("%Y%d%m")
+ #global save_to
+ #save_to = input("Cool, where would you like me to put the results?:")
  df1 = pd.read_excel(take_from)
  df1 = df1.applymap(str)
  df1['New'] = df1.groupby(['GSDID'])['NMUID'].transform(lambda x : ', '.join(x)) 
  df1 = df1.drop_duplicates(subset='GSDID', keep='first') 
-
  df1['new2'] = ['Shell Recharge' for _ in range(len(df1))]
  df1.rename(columns={'GSDID': 'Shell_Site_ID', 'New': 'NewMotion Charge Post Location UID','new2': 'Operator'}, inplace=True)
  df1['Shell_Site_ID'] = [i.replace('.0',"")for i in df1['Shell_Site_ID']]
  df1['NewMotion Charge Post Location UID']= [i.replace('.0','')for i in df1['NewMotion Charge Post Location UID']]
-
  duff_rows = df1[df1['Shell_Site_ID']=='nan'].index
  df1.drop(duff_rows, inplace=True)
+ df1[['Shell_Site_ID','NewMotion Charge Post Location UID','Operator']].to_excel(take_from+"/Shell-Newmotion-mapping-"+date+".xlsx", index=False)
+ print("")
 
- df1[['Shell_Site_ID','NewMotion Charge Post Location UID','Operator']].to_excel(save_to+"/Shell-Newmotion-mapping-"+date+".xlsx", index=False)
- print(""" Your Wish is my command
-         ***
-         ***
-         ***
-    MAGIC STUFF HAPPENING
-         ***
-         ***
-         ***
-         """)
-#index = df1.index
-#number_of_rows = len(index)
-#deleted_rows = duff_rows.index
-#number_of_deleted_rows = len(deleted_rows)
+def wet_checker():
+ df = pd.read_excel(take_from)
+ ocean_data = df
+ if 'Coordinate Checker' not in ocean_data:
+    ocean_data['Coordinate Checker'] = "" 
+ for ind in ocean_data.index: 
+     is_on_land = globe.is_land(ocean_data['Lat'][ind], ocean_data['Lng'][ind])
+     if (is_on_land == False):
+         ocean_data['Coordinate Checker'][ind]= 'Oops, that looks a little wet!'
+ ocean_data.to_excel(take_from, index=False)
+ print('\nThat\'s all done for you')
+ validation_selector()
 
+def wet_checker_single_site():
+    
+ lat = input('Whats the lattidute of the site you want to check?: ')
+ lng = input('Whats the longtitude of the site you want to check?: ')
+ is_on_land = globe.is_land(float(lat), float(lng))
+ if (is_on_land == False):
+    print('\n\nWhoops, looks like you\'re getting wet there!')
+ else: print('\n\nThat looks like land to me!')
+ 
+ selection = input ("What would you like to do now?\n[1] Look up another coordinate \n[2] Return to the main menu \n[3] Quit \n \n Type '1', '2' or '3': ")
+ if (selection =='1'): wet_checker_single_site()
+ elif (selection =='2'): validation_selector()
+ elif (selection == '3'):print("\n""\n""\t""\t""\t""\t""\t""\t""\t""\t""***Goodbye***" "\n""\n")
+    
+def individual_country_code_lookup():###huh??
+    
+ lookup_country = input('what country would you like the country code for?')
+ lookup_country = lookup_country.title()
 
- print("I've created the file and saved it to"+save_to)
- end_selector()
+# Get list of keys that contains the given value
+ list_of_keys = [key
+                for key, list_of_values in country_bounding_boxes.items()
+                if lookup_country in list_of_values]
+ if list_of_keys:
+    print("\n\n")
+    print(list_of_keys)
+ else:
+    print("\n\n"+lookup_country+" wasn't found - please check the spelling \n\n")
 
-
-#validatin function
-def country_validation():
-
-
-
- bounding_box = pd.DataFrame(country_bounding_boxes)
- bounding_box = bounding_box.transpose()
- bounding_box['Country Code']= bounding_box.index
- bounding_box.columns = ['Long_Country', 'lngmin','latmin','lngmax', 'latmax','Country Code']
-#print(bounding_box.head())
-
-
-    #pick up file
+ print('\n What would you like to do now?')
+ global selection
+ selection = input("[1] Look up another country code \n [2] Return to the main menu \n [3] Quit \n \n Type '1', '2' or '3': ")
+ if (selection == '1'): 
+  individual_country_code_lookup()
+ elif (selection == '2'):
+  validation_selector()
+ elif (selection == '3'):
+  print("\n""\n""\t""\t""\t""\t""\t""\t""\t""\t""***Goodbye***" "\n""\n")
+  
+def country_validation_input():
+ global take_from
  take_from = input ("""
                     
 Hi there, i'm going to help you validate your coordinates.
  
  
 Before starting, please ensure the column containing latitudes is titled 'Lat', the column containing longtitudes is titled 'Lng' and the column containing country code is titled 'Country Code' 
-                   
-                   
-                   
+       
 Where is the file saved? 
 
 """)
+
+ blank_coordinate_check()
+
+def blank_coordinate_check():
+ global test_data
  test_data = pd.read_excel(take_from)
+ if test_data['Lat'].isnull().any():
+    print("\n" "\n" "\n" "At least one coordinate is missing - please ensure each site has valid coordinates""\n")
+    end_selector()
+ elif test_data['Lng'].isnull().any():
+      print('\n\n\n At least one coordinate is missing - please ensure each site has valid coordinates'"\n")
+      end_selector()
+ else: country_code_checker()
+
+def country_code_checker():
+   if "Country Code" in test_data:
+       country_validation()
+   elif 'Country' in test_data: 
+       country_validation_no_country_code()
+   else: print('No "Country" or "Country Code" columns detected - please check column headings and try again')
+                      
+def country_validation():
+#transform base coordinate dataframe
+ bounding_box = pd.DataFrame(country_bounding_boxes)
+ bounding_box = bounding_box.transpose()
+ bounding_box['Country Code']= bounding_box.index
+ bounding_box.columns = ['Country', 'lngmin','latmin','lngmax', 'latmax','Country Code']
+ global test_data
  test_data['Country Code'] = test_data['Country Code'].str.upper()       
  bounding_box['Country Code'] = bounding_box['Country Code'].str.upper() 
  test_data.replace(" ", "")
  bounding_box.replace(" ", "")
-
+ global to_use
  to_use  = pd.merge(test_data,  
                       bounding_box,  
                       on ='Country Code',  
                       how ='left') 
-
 #test lat
  conditions_lat = [
-    (to_use['Lat'] <= to_use['latmax']) & (to_use['Lat'] >= to_use['latmin']),
-    (to_use['Lat'] > to_use['latmax']),
-    (to_use['Lat'] < to_use['latmin'])]
-
- values = ['Match', 'Higher than expected', 'Lower than expected']
-
- to_use['Latitude Validation'] = np.select(conditions_lat, values)
-
-#test long
- conditions_lng = [
-    (to_use['Lng'] <= to_use['lngmax']) & (to_use['Lng'] >= to_use['lngmin']),
+    (to_use['Lat'] <= to_use['latmax']) & (to_use['Lat'] >= to_use['latmin']) &  (to_use['Lng'] <= to_use['lngmax']) & (to_use['Lng'] >= to_use['lngmin']),
+    (to_use['Lat'] > to_use['latmax']) &  (to_use['Lng'] > to_use['lngmax']),
+    (to_use['Lat'] > to_use['latmax']) &   (to_use['Lng'] < to_use['lngmin']),
+    (to_use['Lat'] < to_use['latmin']) &  (to_use['Lng'] > to_use['lngmax']),
+    (to_use['Lat'] < to_use['latmin']) &  (to_use['Lng'] < to_use['lngmin']),
     (to_use['Lng'] > to_use['lngmax']),
-    (to_use['Lng'] < to_use['lngmin'])]
-
- to_use['Longtitude Validation'] = np.select(conditions_lng, values)
- to_use = to_use.drop(['lngmin','lngmax', 'latmin', 'latmax', 'Long_Country'], axis = 1)
+    (to_use['Lng'] < to_use['lngmin']),
+    (to_use['Lat'] < to_use['latmin']),
+    (to_use['Lat'] > to_use['latmax'])
+    ]
+    
+ values1 = ['-', 'This looks too far North-East to be '+ to_use['Country'], 'This looks too far North-West to be ' + to_use['Country'], 'This looks too far South-East to be '+ to_use['Country'], 'This looks too far South-West to be '+ to_use['Country'],'This looks too far East to be '+ to_use['Country'], 'This Looks too far West to be '+ to_use['Country'], 'This Looks too far North to be '+ to_use['Country'],'This Looks too far South to be '+ to_use['Country']]
+ to_use['Coordinate Checker'] = np.select(conditions_lat, values1)
+ to_use = to_use.drop(['lngmin','lngmax', 'latmin', 'latmax', 'Country'], axis = 1)
  to_use.to_excel(take_from, index=False)
- 
- print("""
-       
- Your file has been validated - the results can be seen in the 'Latitude Validation' and 'Longtitide Validation' columns""")
- end_selector()
+ print("\n""***Your file has been validated - the results can be seen in the 'Latitude Validation' and 'Longtitide Validation' columns")
+ wet_checker()
+  
+def country_validation_no_country_code():
+#transform base coordinate dataframe
+ bounding_box = pd.DataFrame(country_bounding_boxes)
+ bounding_box = bounding_box.transpose()
+ bounding_box['Country Code']= bounding_box.index
+ bounding_box.columns = ['Country', 'lngmin','latmin','lngmax', 'latmax','Country Code']
+ global test_data
+ test_data['Country'] = test_data['Country'].str.upper()       
+ bounding_box['Country'] = bounding_box['Country'].str.upper() 
+ test_data.replace(" ", "")
+ bounding_box.replace(" ", "")
+ bounding_box = bounding_box
+ global to_use
+ to_use  = pd.merge(test_data,  
+                      bounding_box,  
+                      on ='Country',  
+                      how ='left') 
+
+ conditions_lat = [
+    (to_use['Lat'] <= to_use['latmax']) & (to_use['Lat'] >= to_use['latmin']) &  (to_use['Lng'] <= to_use['lngmax']) & (to_use['Lng'] >= to_use['lngmin']),
+    (to_use['Lat'] > to_use['latmax']) &  (to_use['Lng'] > to_use['lngmax']),
+    (to_use['Lat'] > to_use['latmax']) &   (to_use['Lng'] < to_use['lngmin']),
+    (to_use['Lat'] < to_use['latmin']) &  (to_use['Lng'] > to_use['lngmax']),
+    (to_use['Lat'] < to_use['latmin']) &  (to_use['Lng'] < to_use['lngmin']),
+    (to_use['Lng'] > to_use['lngmax']),
+    (to_use['Lng'] < to_use['lngmin']),
+    (to_use['Lat'] < to_use['latmin']),
+    (to_use['Lat'] > to_use['latmax'])
+    ]
+    
+ values1 = ['-', 'This looks too far North-East to be '+ to_use['Country'], 'This looks too far North-West to be ' + to_use['Country'], 'This looks too far South-East to be '+ to_use['Country'], 'This looks too far South-West to be '+ to_use['Country'],'This looks too far East to be '+ to_use['Country'], 'This Looks too far West to be '+ to_use['Country'], 'This Looks too far North to be '+ to_use['Country'],'This Looks to far South to be '+ to_use['Country']]
+ to_use['Coordinate Checker'] = np.select(conditions_lat, values1)
+ to_use = to_use.drop(['lngmin','lngmax', 'latmin', 'latmax', 'Country'], axis = 1)
+ to_use.to_excel(take_from, index=False)
+ print("\n""***Your file has been validated - the results can be seen in the 'Latitude Validation' and 'Longtitide Validation' columns")
+ wet_checker()
+
+#Run
 validation_selector() 
-#print(to_use)
- 
-#which function to use?
 
 
-validation_selector()
+
+
